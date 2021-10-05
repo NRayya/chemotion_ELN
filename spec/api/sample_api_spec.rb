@@ -278,6 +278,7 @@ describe Chemotion::SampleAPI do
 
     describe 'POST /api/v1/samples' do
       context 'with valid parameters' do
+        let!(:m1) { create(:molecule, inchikey: 'DTHMTBUWTGVEFG-DDWIOCJRSA-N', is_partial: false) }
         let(:cas) { 'test_cas' }
         let(:params) do
           {
@@ -305,7 +306,8 @@ describe Chemotion::SampleAPI do
               is_new: true,
               is_deleted: false,
               name: 'new'
-            }
+            },
+            molecule_id: m1.id
           }
         end
 
