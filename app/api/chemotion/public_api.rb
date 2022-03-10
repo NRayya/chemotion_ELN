@@ -191,11 +191,90 @@ module Chemotion
             Affiliation.where(domain: params[:domain]).where.not(organization: nil).first&.organization
         end
       end
+
+      namespace :token do
+        desc 'start editing a document'
+        params do
+          requires :username, type: String, desc: 'Username'
+          requires :password, type: String, desc: 'Password'
+        end
+        post do
+          user = User.where(name_abbreviation: params[:username]).or(User.where(email: params[:username])).take
+          error!('404 Not found', 404) if user.nil?
+          isValidUser = user.valid_password?(params[:password])
+          error!('401 Not found', 404) unless isValidUser
+  
+          payload = {
+            first_name: user[:first_name],
+            user_id: user.id,
+            last_name: user[:last_name],
+            exp: (Time.now + 6.months).to_i
+          }
+  
+          token = JWT.encode payload, Rails.application.secrets.secret_key_base
+          { token: token }
+        end
+      end
+
+      namespace :tasks do
+        before do
+          pattern = /^Bearer /
+          header  = request.headers['Authorization']
+          error!('403 Forbidden', 403) if header.nil?
+          token = header.gsub(pattern, '') if header&.match(pattern)
+          begin
+            @payload = JWT.decode(token, Rails.application.secrets.secret_key_base) unless token.nil?
+          rescue JWT::VerificationError
+            error!('401 Unauthorized', 401)
+          end
+
+          error!('401 Unauthorized', 401) if @payload&.length.zero?
+        end
+
+        desc 'Get task list for current user'
+        params do
+          optional :status, type: String, desc: 'Status', default: 'To do'
+        end
+        get do
+          user_id = @payload[0]['user_id']&.to_i
+          tasks = Task.where(created_by: user_id, status: params[:status]).includes(:sample).all
+          Entities::TaskEntity.represent(tasks, serializable: true)
+        end
+
+        desc 'Update task info'
+        params do
+          requires :id, type: Integer, desc: 'Task ID'
+          requires :measurement, type: Float, desc: 'Measurement'
+          optional :description, type: String, desc: 'Description', default: 'g'
+          optional :measurementUnit, type: String, desc: 'Measurement Unit'
+          optional :privateNote, type: String, desc: 'private_note'
+          optional :additionalNote, type: String, desc: 'additional_note'
+        end
+        route_param :id do
+          put do
+            user_id = @payload[0]['user_id']&.to_i
+            task = Task.where(id: params[:id], created_by: user_id, status: 'To do').includes(:sample).take
+            error!('400 Bad Request', 400) if task.nil?
+
+            task.update!(status: 'Done', measurement_value: params[:measurement], measurement_unit: params[:measurementUnit], description: params[:description], private_note: params[:privateNote], additional_note: params[:additionalNote])
+            sample = task.sample
+            sample.update!(real_amount_value: params[:measurement], real_amount_unit: params[:measurementUnit], description: params[:description])
+            PrivateNote.create!(
+              content: params[:privateNote],
+              noteable_id: sample[:id],
+              noteable_type: 'Sample',
+              created_by: user_id
+            )
+
+            task
+          end
+        end
+      end
     end
 
     namespace :upload do
       before do
-        error!('Unauthorized' , 401) unless TokenAuthentication.new(request, with_remote_addr: true).is_successful?
+        error!('Unauthorized', 401) unless TokenAuthentication.new(request, with_remote_addr: true).is_successful?
       end
       resource :attachments do
         desc "Upload files"

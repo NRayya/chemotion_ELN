@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2022_03_09_182512) do
+ActiveRecord::Schema.define(version: 2022_03_11_130838) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "hstore"
@@ -1034,6 +1034,20 @@ ActiveRecord::Schema.define(version: 2022_03_09_182512) do
     t.index ["user_id", "fake_ancestry"], name: "index_sync_collections_users_on_user_id_and_fake_ancestry"
   end
 
+  create_table "tasks", force: :cascade do |t|
+    t.string "status", default: "To do"
+    t.integer "measurement_value"
+    t.string "measurement_unit", default: "s", null: false
+    t.string "description"
+    t.string "private_note"
+    t.string "additional_note"
+    t.datetime "created_at", null: false
+    t.integer "created_by", null: false
+    t.datetime "updated_at"
+    t.bigint "sample_id"
+    t.index ["sample_id"], name: "index_tasks_on_sample_id"
+  end
+
   create_table "text_templates", id: :serial, force: :cascade do |t|
     t.string "type"
     t.integer "user_id", null: false
@@ -1160,6 +1174,7 @@ ActiveRecord::Schema.define(version: 2022_03_09_182512) do
 
   add_foreign_key "literals", "literatures"
   add_foreign_key "report_templates", "attachments"
+  add_foreign_key "tasks", "samples"
 
   create_function :user_instrument, sql_definition: <<-SQL
       CREATE OR REPLACE FUNCTION public.user_instrument(user_id integer, sc text)

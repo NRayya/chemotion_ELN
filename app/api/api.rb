@@ -141,6 +141,8 @@ class API < Grape::API
   mount Chemotion::ReportTemplateAPI
   mount Chemotion::PrivateNoteAPI
   mount Chemotion::NmrdbAPI
+  mount Chemotion::TaskAPI
+
 
   add_swagger_documentation(info: {
     "title": "Chemotion ELN",
